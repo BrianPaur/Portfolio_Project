@@ -29,6 +29,18 @@ class Portfolio:
 
         # prints out db in table form
         # returns empty table if no data points
+
+        df = pd.read_sql_query("SELECT ticker FROM port WHERE ticker != ?", connection, params=('CASH',))
+        df = df.values.tolist()
+        for i in df:
+            quantity = cursor.execute("SELECT quantity FROM port WHERE ticker = ?", (i[0],)).fetchone()[0]
+            price = self.apisetup.quote(i)['c']
+            new_market_value = quantity * price
+            cursor.execute("UPDATE port SET price = ?, market_value = ? WHERE ticker = ?",
+                           (price, new_market_value, str(i[0])))
+            connection.commit()
+        cursor.close()
+
         df = pd.read_sql_query("SELECT * FROM port", connection)
         print(df)
 
@@ -159,6 +171,16 @@ class Portfolio:
         except:
             print('No holdings of this security')
 
+    def buying_power(self, ticker):
+        # establishes db connection
+        connection = self.port
+        cursor = connection.cursor()
+        cash_bal = cursor.execute("SELECT quantity FROM port WHERE ticker = ?", ('CASH',)).fetchone()[0]
+        price = self.apisetup.quote(ticker.upper())['c']
+        buy_power = round(cash_bal/price,2)
+        print(f'Buying Power: {buy_power} shares of {ticker}')
+
+
 class SecurityInfo:
     def __init__(self, apisetup):
         self.apisetup = apisetup
@@ -191,8 +213,12 @@ if __name__ == "__main__":
 
     # example:
     a = Portfolio(sqlite3.connect("Stock_Portfolio.db"), finnhub.Client(api_key=api_key))
-    a.buy('msft', 3)
-    a.transactions()
+    b = SecurityInfo(finnhub.Client(api_key=api_key))
+    # a.deposit_cash(1000)
+    # a.transactions()
+    # b.currentprice('btc-usd')
+    # a.buy('btc-usd',.005)
+    # a.buying_power('btc-usd')
     a.holdings()
 
 
